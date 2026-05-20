@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pokepod</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Fira Code', monospace;
+    background: #0b0020;
+    color: #e8deff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 1.5rem 5rem;
+    background-image:
+      radial-gradient(ellipse 70% 55% at 18% 0%,   rgba(150, 40, 210, 0.22) 0, transparent 55%),
+      radial-gradient(ellipse 55% 40% at 82% 100%,  rgba(0, 170, 230, 0.13) 0, transparent 50%);
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px   1px   at 12% 18%, rgba(255,255,255,0.75) 0, transparent 100%),
+      radial-gradient(1px   1px   at 70%  8%, rgba(200,170,255,0.70) 0, transparent 100%),
+      radial-gradient(1px   1px   at 35% 52%, rgba(255,255,255,0.60) 0, transparent 100%),
+      radial-gradient(1px   1px   at 86% 38%, rgba(140,210,255,0.65) 0, transparent 100%),
+      radial-gradient(1px   1px   at 54% 76%, rgba(255,255,255,0.55) 0, transparent 100%),
+      radial-gradient(1px   1px   at  6% 63%, rgba(255,170,210,0.60) 0, transparent 100%),
+      radial-gradient(1px   1px   at 91% 70%, rgba(255,255,255,0.60) 0, transparent 100%),
+      radial-gradient(1px   1px   at 22% 90%, rgba(200,170,255,0.55) 0, transparent 100%),
+      radial-gradient(1.5px 1.5px at 48% 14%, rgba(255,255,255,0.80) 0, transparent 100%),
+      radial-gradient(1.5px 1.5px at 78% 55%, rgba(140,210,255,0.70) 0, transparent 100%),
+      radial-gradient(2px   2px   at 62% 30%, rgba(255,255,255,0.85) 0, transparent 100%),
+      radial-gradient(2px   2px   at 30% 75%, rgba(200,170,255,0.75) 0, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body > * { position: relative; z-index: 1; }
+
+  header { text-align: center; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: 2.8rem;
+    font-weight: 600;
+    color: #e8deff;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.3rem;
+  }
+  h1 em { color: #c084fc; font-style: normal; }
+
+  .tagline {
+    font-size: 0.72rem;
+    color: #5a4080;
+    letter-spacing: 0.06em;
+    margin-top: 0.4rem;
+  }
+
+  .input-box {
+    background: rgba(14, 4, 32, 0.85);
+    border: 1px solid rgba(160, 90, 240, 0.28);
+    border-radius: 16px;
+    padding: 1.75rem 2rem;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 2.5rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.68rem;
+    color: #8b6dc0;
+    letter-spacing: 0.14em;
+    margin-bottom: 0.6rem;
+  }
+
+  input[type="date"] {
+    width: 100%;
+    background: rgba(5, 0, 18, 0.7);
+    border: 1px solid rgba(160, 90, 240, 0.32);
+    border-radius: 10px;
+    padding: 0.8rem 0.9rem;
+    color: #e8deff;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.92rem;
+    margin-bottom: 1rem;
+    outline: none;
+    color-scheme: dark;
+    transition: border-color 0.2s;
+  }
+  input[type="date"]:focus { border-color: rgba(192, 132, 252, 0.65); }
+
+  button {
+    width: 100%;
+    background: #7c3aed;
+    border: none;
+    border-radius: 10px;
+    padding: 0.85rem;
+    color: #fff;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s, transform 0.1s;
+  }
+  button:hover   { background: #6d28d9; }
+  button:active  { transform: scale(0.98); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .results {
+    width: 100%;
+    max-width: 880px;
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+  .results.visible { display: grid; }
+
+  .card {
+    background: rgba(14, 4, 32, 0.85);
+    border: 1px solid rgba(160, 90, 240, 0.22);
+    border-radius: 16px;
+    padding: 1.4rem;
+    transition: border-color 0.4s, box-shadow 0.4s;
+  }
+
+  .card-tag {
+    font-size: 0.65rem;
+    color: #5a4080;
+    letter-spacing: 0.14em;
+    margin-bottom: 0.85rem;
+  }
+
+  #apod-img {
+    width: 100%;
+    border-radius: 10px;
+    aspect-ratio: 16/10;
+    object-fit: cover;
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+  #apod-title        { font-size: 0.88rem; font-weight: 600; color: #ddd6fe; line-height: 1.4; margin-bottom: 0.3rem; }
+  #apod-date-display { font-size: 0.68rem; color: #4a3070; }
+
+  .poke-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.35rem; }
+
+  #poke-sprite {
+    width: 140px; height: 140px;
+    image-rendering: pixelated;
+    margin: 0.4rem 0;
+    transition: filter 0.4s;
+  }
+
+  #poke-name {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #ddd6fe;
+    text-transform: capitalize;
+  }
+
+  .types { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; margin: 0.3rem 0 0.5rem; }
+
+  .type-pill {
+    font-size: 0.62rem;
+    font-weight: 500;
+    padding: 0.24rem 0.62rem;
+    border-radius: 100px;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  .color-note { font-size: 0.68rem; color: #4a3070; display: flex; align-items: center; gap: 0.4rem; }
+  .swatch     { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  #poke-flavor {
+    font-size: 0.76rem;
+    color: #7060a0;
+    line-height: 1.75;
+    font-style: italic;
+    max-width: 240px;
+  }
+
+  .loading {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: #3a2860;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+  }
+  .loading::after {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #c084fc;
+    margin-left: 6px;
+    animation: blink 0.9s ease-in-out infinite;
+    vertical-align: middle;
+  }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.1; } }
+
+  .error-msg { padding: 2rem; text-align: center; color: #f87171; font-size: 0.78rem; }
+
+  #apod-video { width:100%; aspect-ratio:16/9; border-radius:10px; border:none; display:none; margin-bottom:0.75rem; }
+
+  /* Java section */
+  .java-section { width: 100%; max-width: 880px; margin-top: 2.5rem; }
+
+  .java-card {
+    background: rgba(14, 4, 32, 0.85);
+    border: 1px solid rgba(250, 200, 50, 0.18);
+    border-radius: 16px;
+    padding: 1.75rem 2rem;
+  }
+
+  .java-tag { font-size: 0.65rem; color: #8a7030; letter-spacing: 0.14em; margin-bottom: 1.25rem; }
+
+  .java-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+
+  .java-desc h3 { font-size: 1rem; font-weight: 600; color: #fde68a; margin-bottom: 0.85rem; line-height: 1.5; }
+  .java-desc p  { font-size: 0.78rem; color: #9080b8; line-height: 1.9; margin-bottom: 0.75rem; }
+
+  .change-list { list-style: none; font-size: 0.76rem; color: #9080b8; line-height: 2.1; margin-bottom: 1rem; }
+  .change-list li::before { content: '// '; color: #4a7a5a; }
+
+  .code-tag { font-size: 0.6rem; color: #4a3070; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+
+  pre {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(250,200,50,0.1);
+    border-radius: 10px;
+    padding: 1.1rem 1.2rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.68rem;
+    color: #c8b8f0;
+    line-height: 1.85;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .kw { color: #f472b6; }
+  .fn { color: #86efac; }
+  .cm { color: #3a5a3a; }
+  .nm { color: #c4b5fd; }
+  .st { color: #fde68a; }
+
+  .gh-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+    padding: 0.48rem 1rem;
+    background: rgba(250,200,50,0.07);
+    border: 1px solid rgba(250,200,50,0.22);
+    border-radius: 100px;
+    color: #fde68a;
+    text-decoration: none;
+    font-size: 0.68rem;
+    transition: background 0.18s;
+  }
+  .gh-link:hover { background: rgba(250,200,50,0.14); }
+
+  @media (max-width: 620px) {
+    h1 { font-size: 2rem; }
+    .results.visible { grid-template-columns: 1fr; }
+    .java-grid { grid-template-columns: 1fr; }
+    .input-box, .java-card { padding: 1.25rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>poke<em>pod</em></h1>
+  <p class="tagline">// birthday → nasa apod → pokémon</p>
+</header>
+
+<div class="input-box">
+  <label for="bday">// your birthday</label>
+  <input type="date" id="bday" min="1995-06-16">
+  <button id="go">find my pokémon →</button>
+</div>
+
+<div class="results" id="results">
+  <div class="card" id="apod-card">
+    <div class="card-tag">// birthday sky</div>
+    <div class="loading" id="apod-loading">fetching from nasa</div>
+    <iframe id="apod-video" allowfullscreen></iframe>
+    <img id="apod-img" style="display:none" alt="astronomy picture of the day">
+    <div id="apod-title"></div>
+    <div id="apod-date-display"></div>
+  </div>
+  <div class="card poke-card" id="poke-card">
+    <div class="card-tag">// birthday pokémon</div>
+    <div class="loading" id="poke-loading">querying pokéapi</div>
+    <img id="poke-sprite" style="display:none" alt="pokémon">
+    <div id="poke-name" style="display:none"></div>
+    <div class="types" id="types" style="display:none"></div>
+    <div class="color-note" id="color-note" style="display:none"></div>
+    <p id="poke-flavor" style="display:none"></p>
+  </div>
+</div>
+
+<canvas id="canvas" style="display:none" width="100" height="100"></canvas>
+
+<div class="java-section">
+  <div class="java-card">
+    <div class="java-tag">// original java desktop app</div>
+    <div class="java-grid">
+      <div class="java-desc">
+        <h3>PokePod!!!</h3>
+        <p>This started as a JavaFX desktop app I built for cs1302. You type in a date, it grabs the NASA APOD, then reads <em>every pixel</em> using a hand-rolled color classifier to find the dominant hue — and gives you 3 matching Pokémon. Ended up being one of my favorite projects from that class.</p>
+        <p>The web version is a direct port — the pixel math is identical, just translated from Java's <code style="color:#c4b5fd">PixelReader.getArgb()</code> to the Canvas API.</p>
+        <ul class="change-list">
+          <li>JavaFX Stage → HTML/CSS</li>
+          <li>HttpClient + Gson → fetch API</li>
+          <li>PixelReader → getImageData()</li>
+          <li>3 pokémon → 1 with flavor text</li>
+          <li>official artwork + type badges</li>
+        </ul>
+        <a class="gh-link" href="https://github.com/PrachiDPatel/pokemon-space-gen/tree/main/src" target="_blank">
+          ↗ java source on github
+        </a>
+      </div>
+      <div>
+        <div class="code-tag">// APODApi.java — pixel color loop</div>
+        <pre><span class="cm">// scan every pixel in 200×200 thumbnail</span>
+<span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; x; i++) {
+  <span class="kw">for</span> (<span class="kw">int</span> j = 0; j &lt; y; j++) {
+    String c = <span class="fn">getCommonColor</span>(img, i, j);
+    <span class="kw">if</span> (c.<span class="fn">equals</span>(<span class="st">"black"</span>))
+      colorCounter[<span class="nm">4</span>] = <span class="nm">.000000001</span>; <span class="cm">// de-weight</span>
+    <span class="kw">else</span>
+      colorCounter[colorIndex]++;
+  }
+}
+
+<span class="cm">// Manhattan distance to find closest color</span>
+<span class="kw">int</span> <span class="fn">rgbDistance</span>(<span class="kw">int</span>[] rgb, <span class="kw">int</span> r, <span class="kw">int</span> g, <span class="kw">int</span> b) {
+  <span class="kw">return</span> Math.<span class="fn">abs</span>(rgb[<span class="nm">0</span>] - r)
+       + Math.<span class="fn">abs</span>(rgb[<span class="nm">1</span>] - g)
+       + Math.<span class="fn">abs</span>(rgb[<span class="nm">2</span>] - b);
+}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const NASA_KEY = '5eW76bDFae9tlYl8ANPba9Zp1NJ1fTheQR6Zreng';
+const APOD_BASE = 'https://api.nasa.gov/planetary/apod';
+const POKE_BASE = 'https://pokeapi.co/api/v2';
+
+const TYPE_COLORS = {
+  normal:'#9099a1',fire:'#ff7c3f',water:'#4d90d5',grass:'#63bb5b',
+  electric:'#f4d23c',ice:'#74cec0',fighting:'#ce4069',poison:'#ab6ac8',
+  ground:'#d97746',flying:'#8fa8dd',psychic:'#f97176',bug:'#90c12c',
+  rock:'#c7b78b',ghost:'#5269ac',dragon:'#0a6dc4',dark:'#5a5366',
+  steel:'#5a8ea1',fairy:'#ec8fe6',
+};
+
+const COLOR_SWATCHES = {
+  red:'#ef4444',blue:'#3b82f6',yellow:'#eab308',green:'#22c55e',
+  purple:'#a855f7',pink:'#ec4899',black:'#374151',brown:'#92400e',
+  gray:'#6b7280',white:'#e5e7eb',
+};
+
+const COLORS = ['red','blue','yellow','green','black','brown','purple','gray','white','pink'];
+const COLOR_RGB = {
+  red:[225,0,0],blue:[0,0,225],yellow:[225,225,0],green:[0,225,0],
+  black:[0,0,0],brown:[102,51,0],purple:[127,0,255],gray:[160,160,160],
+  white:[225,225,225],pink:[255,0,127],
+};
+
+function rgbDistance(px, target) {
+  return Math.abs(px[0]-target[0]) + Math.abs(px[1]-target[1]) + Math.abs(px[2]-target[2]);
+}
+
+function closestColor(r, g, b) {
+  let best = 0, bestDist = Infinity;
+  COLORS.forEach((name, i) => {
+    const d = rgbDistance([r,g,b], COLOR_RGB[name]);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return COLORS[best];
+}
+
+function analyzeCanvas(canvas) {
+  const ctx = canvas.getContext('2d');
+  const {data} = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const counts = {};
+  COLORS.forEach(c => counts[c] = 0);
+  for (let i = 0; i < data.length; i += 4) {
+    const name = closestColor(data[i], data[i+1], data[i+2]);
+    if      (name === 'black') counts.black = 0.000000001;
+    else if (name === 'brown') counts.brown = 0.0000000001;
+    else if (name === 'gray')  counts.gray  = 0.00000001;
+    else if (name === 'white') counts.white = 0.3;
+    else counts[name]++;
+  }
+  return Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+}
+
+async function getColorFromImage(url) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.getElementById('canvas');
+        canvas.getContext('2d').drawImage(img, 0, 0, 100, 100);
+        resolve(analyzeCanvas(canvas));
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+    setTimeout(() => resolve(null), 8000);
+  });
+}
+
+function dateToColor(dateStr) {
+  const vivid = ['red','blue','yellow','green','purple','pink'];
+  let h = 0;
+  for (const c of dateStr) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return vivid[h % vivid.length];
+}
+
+async function getPokemon(color) {
+  const res = await fetch(`${POKE_BASE}/pokemon-color/${color}/`);
+  if (!res.ok) throw new Error('color fetch failed');
+  const data = await res.json();
+  const species = data.pokemon_species;
+  const pick = species[Math.floor(Math.random() * Math.min(species.length, 40))];
+
+  const pokeRes = await fetch(`${POKE_BASE}/pokemon/${pick.name}/`);
+  if (!pokeRes.ok) throw new Error('pokemon fetch failed');
+  const poke = await pokeRes.json();
+
+  let flavor = '';
+  try {
+    const specRes = await fetch(`${POKE_BASE}/pokemon-species/${pick.name}/`);
+    const specData = await specRes.json();
+    const entry = specData.flavor_text_entries.find(e => e.language.name === 'en');
+    if (entry) flavor = entry.flavor_text.replace(/\f/g, ' ');
+  } catch {}
+
+  return {
+    name: poke.name,
+    sprite: poke.sprites.other?.['official-artwork']?.front_default || poke.sprites.front_default,
+    types: poke.types.map(t => t.type.name),
+    flavor,
+  };
+}
+
+async function run() {
+  const dateVal = document.getElementById('bday').value;
+  if (!dateVal) return;
+
+  const btn = document.getElementById('go');
+  btn.disabled = true;
+  btn.textContent = 'loading...';
+
+  document.getElementById('results').classList.add('visible');
+  ['apod-img','apod-video','poke-sprite','poke-name','types','color-note','poke-flavor']
+    .forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('apod-loading').style.display = 'block';
+  document.getElementById('poke-loading').style.display = 'block';
+
+  try {
+    const apodRes = await fetch(`${APOD_BASE}?api_key=${NASA_KEY}&date=${dateVal}&hd=false`);
+    if (!apodRes.ok) throw new Error(`APOD ${apodRes.status}`);
+    const apod = await apodRes.json();
+
+    document.getElementById('apod-loading').style.display = 'none';
+    document.getElementById('apod-title').textContent = apod.title;
+    document.getElementById('apod-date-display').textContent =
+      new Date(dateVal + 'T12:00:00').toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+    let imageUrl = null;
+    if (apod.media_type === 'video') {
+      const iframe = document.getElementById('apod-video');
+      iframe.src = apod.url;
+      iframe.style.display = 'block';
+    } else {
+      imageUrl = apod.hdurl || apod.url;
+      const img = document.getElementById('apod-img');
+      img.src = imageUrl;
+      img.style.display = 'block';
+    }
+
+    let color = imageUrl ? await getColorFromImage(imageUrl) : null;
+    if (!color) color = dateToColor(dateVal);
+
+    const poke = await getPokemon(color);
+    document.getElementById('poke-loading').style.display = 'none';
+
+    const sprite = document.getElementById('poke-sprite');
+    sprite.src = poke.sprite;
+    sprite.style.display = 'block';
+
+    const accent = TYPE_COLORS[poke.types[0]] || '#9c4dff';
+    sprite.style.filter = `drop-shadow(0 0 20px ${accent}88)`;
+
+    document.getElementById('poke-name').textContent = poke.name;
+    document.getElementById('poke-name').style.display = 'block';
+
+    const typesEl = document.getElementById('types');
+    typesEl.innerHTML = poke.types.map(t =>
+      `<span class="type-pill" style="background:${TYPE_COLORS[t]||'#555'}">${t}</span>`
+    ).join('');
+    typesEl.style.display = 'flex';
+
+    const swatch = COLOR_SWATCHES[color] || '#888';
+    document.getElementById('color-note').innerHTML =
+      `<span class="swatch" style="background:${swatch}"></span>sky color: ${color}`;
+    document.getElementById('color-note').style.display = 'flex';
+
+    if (poke.flavor) {
+      const el = document.getElementById('poke-flavor');
+      el.textContent = poke.flavor;
+      el.style.display = 'block';
+    }
+
+    const pokeCard = document.getElementById('poke-card');
+    pokeCard.style.borderColor = accent + '44';
+    pokeCard.style.boxShadow = `0 0 30px -8px ${accent}44`;
+
+  } catch (err) {
+    document.getElementById('apod-loading').style.display = 'none';
+    document.getElementById('poke-loading').style.display = 'none';
+    document.getElementById('apod-card').innerHTML +=
+      `<div class="error-msg">couldn't load — nasa rate limit hit. try again in a minute or <a href="https://api.nasa.gov" style="color:#c084fc">get a free key</a>.</div>`;
+    console.error(err);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'find my pokémon →';
+}
+
+const today = new Date().toISOString().slice(0,10);
+document.getElementById('bday').max = today;
+document.getElementById('bday').value = today;
+document.getElementById('go').addEventListener('click', run);
+document.getElementById('bday').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+</script>
+</body>
+</html>
