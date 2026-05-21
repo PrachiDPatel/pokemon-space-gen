@@ -289,18 +289,17 @@
 
 <header>
   <h1>poke<em>pod</em></h1>
-  <p class="tagline">// birthday → nasa apod → pokémon</p>
+  <p class="tagline">birthday → nasa apod → pokémon</p>
 </header>
 
 <div class="input-box">
-  <label for="bday">// your birthday</label>
+  <label for="bday">your birthday</label>
   <input type="date" id="bday" min="1995-06-16">
   <button id="go">find my pokémon →</button>
 </div>
 
 <p class="disclaimer">
   // uses nasa's DEMO_KEY — 30 requests/hr per IP.<br>
-  // registered keys embedded in client-side code are publicly visible in source.<br>
   // each visitor gets their own quota.
 </p>
 
@@ -334,7 +333,7 @@
       <div class="java-desc">
         <h3>PokePod!!!</h3>
         <p>This started as a JavaFX desktop app I built for cs1302. You type in a date, it grabs the NASA APOD, then reads <em>every pixel</em> using a hand-rolled color classifier to find the dominant hue — and gives you 3 matching Pokémon. Ended up being one of my favorite projects from that class.</p>
-        <p>The web version is a direct port — the pixel math is identical, just translated from Java's <code style="color:#c4b5fd">PixelReader.getArgb()</code> to the Canvas API.</p>
+        <p>The web version runs the same pixel-by-pixel color algorithm — rebuilt for the browser using the Canvas API instead of JavaFX's image reader.</p>
         <ul class="change-list">
           <li>JavaFX Stage → HTML/CSS</li>
           <li>HttpClient + Gson → fetch API</li>
@@ -581,14 +580,12 @@ async function run() {
     document.getElementById('apod-loading').style.display = 'none';
     document.getElementById('poke-loading').style.display = 'none';
     document.getElementById('apod-card').innerHTML +=
-      `<div class="error-msg">nasa rate limit reached.<br><br>this site uses DEMO_KEY, which allows 30 requests per hour per IP —<br>a deliberate tradeoff so no private key is exposed in public source.<br>if you've searched a few times this hour, wait a minute and try again.</div>`;
+      `<div class="error-msg">nasa rate limit reached.<br><br>this site uses DEMO_KEY, which allows 30 requests per hour per IP — if you've searched a few times this hour, wait a minute and try again.</div>`;
     console.error(err);
-  }
-
-  setTimeout(() => {
+  } finally {
     btn.disabled = false;
     btn.textContent = 'find my pokémon →';
-  }, 15000);
+  }
 }
 
 const today = new Date().toISOString().slice(0,10);
