@@ -442,18 +442,27 @@ async function getColorFromImage(url) {
 
 function colorFromText(text) {
   const lower = text.toLowerCase();
+
+  // semantic astronomical types — visually dominant color regardless of emission lines mentioned
+  if (/emission nebula|h.?alpha|hα|molecular cloud|star.forming|stellar nursery|orion|nebula.*red|red.*nebula/.test(lower)) return 'red';
+  if (/galaxy cluster|x.ray|collision of galaxy|merging cluster/.test(lower)) return 'blue';
+  if (/reflection nebula|blue.*nebula|nebula.*blue/.test(lower)) return 'blue';
+  if (/planetary nebula/.test(lower)) return 'blue';
+  if (/supernova remnant/.test(lower)) return 'red';
+
+  // direct color keyword scan — red before green to avoid O[III] false positives
   const checks = [
+    ['red','red'],['scarlet','red'],['crimson','red'],['fiery','red'],
     ['blue','blue'],['cyan','blue'],['azure','blue'],['indigo','blue'],
-    ['red','red'],['orange','red'],
-    ['green','green'],['emerald','green'],
     ['purple','purple'],['violet','purple'],['magenta','purple'],
-    ['pink','pink'],['rose','pink'],
     ['yellow','yellow'],['gold','yellow'],['amber','yellow'],
+    ['pink','pink'],['rose','pink'],
+    ['green','green'],
   ];
   for (const [keyword, color] of checks) {
     if (lower.includes(keyword)) return color;
   }
-  return 'blue'; // space images default to blue — more accurate than a date hash
+  return 'blue'; // space images default to blue
 }
 
 async function getPokemon(color) {
