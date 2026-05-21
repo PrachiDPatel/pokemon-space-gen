@@ -397,7 +397,11 @@ const COLOR_RGB = {
 };
 
 function rgbDistance(px, target) {
-  return Math.abs(px[0]-target[0]) + Math.abs(px[1]-target[1]) + Math.abs(px[2]-target[2]);
+  const dr = px[0] - target[0];
+  const dg = px[1] - target[1];
+  const db = px[2] - target[2];
+  // weighted squared euclidean — perceptual sensitivity: green ~2× red, blue ~0.4× red
+  return 0.299 * dr * dr + 0.587 * dg * dg + 0.114 * db * db;
 }
 
 function closestColor(r, g, b) {
