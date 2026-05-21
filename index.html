@@ -444,13 +444,12 @@ function rgbToHsv(r, g, b) {
 
 function hsvToPokeColor(h, s, v) {
   if (s < 0.18 || v < 0.10) return null; // skip achromatic (black, white, gray, stars)
-  if (h < 20  || h >= 340) return 'red';
-  if (h < 50)  return 'red';    // orange → red (no orange in PokéAPI)
-  if (h < 80)  return 'yellow';
+  if (h < 25  || h >= 330) return 'red';  // pure red / H-alpha crimson
+  if (h < 80)  return 'yellow';           // orange + yellow both → yellow (no orange in PokéAPI)
   if (h < 165) return 'green';
-  if (h < 260) return 'blue';
-  if (h < 290) return 'purple';
-  if (h < 340) return 'pink';
+  if (h < 265) return 'blue';
+  if (h < 295) return 'purple';
+  if (h < 330) return 'pink';
   return 'red';
 }
 
