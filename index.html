@@ -500,9 +500,12 @@ function colorFromText(text) {
 }
 
 async function getColorFromImage(url) {
-  // works on localhost; silently returns null on deployed sites (canvas taint from missing CORS headers)
+  // images.weserv.nl proxies NASA images, adds CORS headers, and resizes to 100×100
+  // so the payload is tiny and canvas.getImageData() isn't blocked
+  const proxy = `https://images.weserv.nl/?url=${url.replace(/^https?:\/\//, '')}&w=100&h=100&fit=cover&output=jpg`;
   return new Promise(resolve => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
         const canvas = document.getElementById('canvas');
@@ -511,8 +514,8 @@ async function getColorFromImage(url) {
       } catch { resolve(null); }
     };
     img.onerror = () => resolve(null);
-    img.src = url;
-    setTimeout(() => resolve(null), 6000);
+    img.src = proxy;
+    setTimeout(() => resolve(null), 10000);
   });
 }
 
@@ -580,10 +583,8 @@ async function run() {
       img.style.display = 'block';
     }
 
-    // text-based color runs first (instant, works everywhere); canvas pixel analysis
-    // is a bonus that only succeeds when served locally (NASA images lack CORS headers)
-    let color = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
-    if (!color && imageUrl) color = await getColorFromImage(imageUrl);
+    let color = imageUrl ? await getColorFromImage(imageUrl) : null;
+    if (!color) color = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
     if (!color) color = 'blue';
 
     const poke = await getPokemon(color);
