@@ -320,6 +320,7 @@
     <div id="poke-name" style="display:none"></div>
     <div class="types" id="types" style="display:none"></div>
     <div class="color-note" id="color-note" style="display:none"></div>
+    <div class="color-note" id="color-fallback-note" style="display:none;font-size:0.6rem;opacity:0.55;margin-top:0.15rem"></div>
     <p id="poke-flavor" style="display:none"></p>
   </div>
 </div>
@@ -424,6 +425,25 @@ function analyzeCanvas(canvas) {
   return Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
 }
 
+function colorFromText(text) {
+  const lower = text.toLowerCase();
+  if (/emission nebula|h.?alpha|hα|molecular cloud|star.forming|stellar nursery|orion/.test(lower)) return 'red';
+  if (/galaxy cluster|x.ray|collision of galaxy|merging cluster/.test(lower)) return 'blue';
+  if (/reflection nebula|planetary nebula/.test(lower)) return 'blue';
+  if (/supernova remnant/.test(lower)) return 'red';
+  const checks = [
+    ['red','red'],['scarlet','red'],['crimson','red'],
+    ['blue','blue'],['cyan','blue'],['azure','blue'],['indigo','blue'],
+    ['purple','purple'],['violet','purple'],
+    ['yellow','yellow'],['gold','yellow'],
+    ['pink','pink'],['green','green'],
+  ];
+  for (const [kw, color] of checks) {
+    if (lower.includes(kw)) return color;
+  }
+  return null; // no match — caller decides the final fallback
+}
+
 async function getColorFromImage(url) {
   return new Promise(resolve => {
     const img = new Image();
@@ -477,7 +497,7 @@ async function run() {
   btn.textContent = 'loading...';
 
   document.getElementById('results').classList.add('visible');
-  ['apod-img','apod-video','poke-sprite','poke-name','types','color-note','poke-flavor']
+  ['apod-img','apod-video','poke-sprite','poke-name','types','color-note','color-fallback-note','poke-flavor']
     .forEach(id => document.getElementById(id).style.display = 'none');
   document.getElementById('apod-loading').style.display = 'block';
   document.getElementById('poke-loading').style.display = 'block';
@@ -505,7 +525,19 @@ async function run() {
     }
 
     let color = imageUrl ? await getColorFromImage(imageUrl) : null;
-    if (!color) color = 'blue'; // canvas blocked by CORS on external images; blue is the most common vivid space color
+    const fallbackNote = document.getElementById('color-fallback-note');
+    if (!color) {
+      const textColor = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
+      if (textColor) {
+        color = textColor;
+        fallbackNote.textContent = '// pixel analysis unavailable (browser cors) — color inferred from image description';
+        fallbackNote.style.display = 'flex';
+      } else {
+        color = 'blue';
+        fallbackNote.textContent = '// could not detect sky color — pixel analysis blocked and no color keywords found in description';
+        fallbackNote.style.display = 'flex';
+      }
+    }
 
     const poke = await getPokemon(color);
     document.getElementById('poke-loading').style.display = 'none';
