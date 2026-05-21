@@ -324,18 +324,9 @@
     pre { white-space: pre-wrap; word-break: break-all; font-size: 0.6rem; }
     .corner-legend { display: none; }
   }
-  #debug-panel {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(0,0,0,0.88); color: #4ade80;
-    font-size: 0.6rem; font-family: monospace;
-    padding: 0.5rem 0.75rem; max-height: 180px;
-    overflow-y: auto; z-index: 999;
-    display: none; white-space: pre-wrap;
-  }
 </style>
 </head>
 <body>
-<div id="debug-panel"></div>
 
 <header>
   <h1>Pokémon <em>Space-Gen</em></h1>
@@ -420,19 +411,6 @@
 </div>
 
 <script>
-// mobile debug panel — mirrors [color] logs to screen
-const _log = console.log.bind(console);
-console.log = (...args) => {
-  _log(...args);
-  const msg = args.join(' ');
-  if (msg.includes('[color]')) {
-    const panel = document.getElementById('debug-panel');
-    panel.style.display = 'block';
-    panel.textContent += msg + '\n';
-    panel.scrollTop = panel.scrollHeight;
-  }
-};
-
 const NASA_KEY = 'DEMO_KEY';
 const APOD_BASE = 'https://api.nasa.gov/planetary/apod';
 const POKE_BASE = 'https://pokeapi.co/api/v2';
@@ -521,59 +499,21 @@ function colorFromText(text) {
   return null;
 }
 
-async function fetchViaProxy(url) {
-  const proxies = [
-    `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  ];
-  for (const proxyUrl of proxies) {
-    const label = proxyUrl.includes('corsproxy') ? 'corsproxy' : 'allorigins';
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(proxyUrl, { signal: controller.signal });
-      clearTimeout(timer);
-      console.log(`[color] ${label} → ${res.status} ${res.headers.get('content-type')}`);
-      if (res.ok) return res;
-    } catch (e) {
-      console.log(`[color] ${label} failed: ${e.message}`);
-    }
-  }
-  console.log('[color] all proxies failed');
-  return null;
-}
-
 async function getColorFromImage(url) {
-  console.log('[color] fetching via proxy:', url.slice(0, 60));
-  try {
-    const res = await fetchViaProxy(url);
-    if (!res) return null;
-    const blob = await res.blob();
-    console.log(`[color] blob: ${blob.size} bytes, type: ${blob.type}`);
-    const objectUrl = URL.createObjectURL(blob);
-    return new Promise(resolve => {
-      const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        try {
-          const canvas = document.getElementById('canvas');
-          canvas.getContext('2d').drawImage(img, 0, 0, 100, 100);
-          const color = analyzeCanvas(canvas);
-          console.log('[color] pixel result:', color);
-          resolve(color);
-        } catch (e) {
-          console.log('[color] canvas error:', e.message);
-          resolve(null);
-        }
-      };
-      img.onerror = () => { URL.revokeObjectURL(objectUrl); console.log('[color] img load failed'); resolve(null); };
-      img.src = objectUrl;
-      setTimeout(() => { console.log('[color] img load timeout'); resolve(null); }, 5000);
-    });
-  } catch (e) {
-    console.log('[color] error:', e.message);
-    return null;
-  }
+  // works on localhost; silently returns null on deployed sites (canvas taint from missing CORS headers)
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.getElementById('canvas');
+        canvas.getContext('2d').drawImage(img, 0, 0, 100, 100);
+        resolve(analyzeCanvas(canvas));
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+    setTimeout(() => resolve(null), 6000);
+  });
 }
 
 
@@ -640,20 +580,11 @@ async function run() {
       img.style.display = 'block';
     }
 
-    let color = imageUrl ? await getColorFromImage(imageUrl) : null;
-    const fallbackNote = document.getElementById('color-fallback-note');
-    if (!color) {
-      const textColor = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
-      if (textColor) {
-        color = textColor;
-        fallbackNote.textContent = '// pixel analysis unavailable (browser cors) — color inferred from image description';
-        fallbackNote.style.display = 'flex';
-      } else {
-        color = 'blue';
-        fallbackNote.textContent = '// could not detect sky color — pixel analysis blocked and no color keywords found in description';
-        fallbackNote.style.display = 'flex';
-      }
-    }
+    // text-based color runs first (instant, works everywhere); canvas pixel analysis
+    // is a bonus that only succeeds when served locally (NASA images lack CORS headers)
+    let color = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
+    if (!color && imageUrl) color = await getColorFromImage(imageUrl);
+    if (!color) color = 'blue';
 
     const poke = await getPokemon(color);
     document.getElementById('poke-loading').style.display = 'none';
