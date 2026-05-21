@@ -429,44 +429,41 @@ const COLOR_SWATCHES = {
   gray:'#6b7280',white:'#e5e7eb',
 };
 
-const COLORS = ['red','blue','yellow','green','black','brown','purple','gray','white','pink'];
-const COLOR_RGB = {
-  red:[225,0,0],blue:[0,0,225],yellow:[225,225,0],green:[0,225,0],
-  black:[0,0,0],brown:[102,51,0],purple:[127,0,255],gray:[160,160,160],
-  white:[225,225,225],pink:[255,0,127],
-};
-
-function rgbDistance(px, target) {
-  const dr = px[0] - target[0];
-  const dg = px[1] - target[1];
-  const db = px[2] - target[2];
-  // weighted squared euclidean — perceptual sensitivity: green ~2× red, blue ~0.4× red
-  return 0.299 * dr * dr + 0.587 * dg * dg + 0.114 * db * db;
+function rgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d > 0) {
+    if      (max === r) h = ((g - b) / d % 6) * 60;
+    else if (max === g) h = ((b - r) / d + 2) * 60;
+    else                h = ((r - g) / d + 4) * 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s: max === 0 ? 0 : d / max, v: max };
 }
 
-function closestColor(r, g, b) {
-  let best = 0, bestDist = Infinity;
-  COLORS.forEach((name, i) => {
-    const d = rgbDistance([r,g,b], COLOR_RGB[name]);
-    if (d < bestDist) { bestDist = d; best = i; }
-  });
-  return COLORS[best];
+function hsvToPokeColor(h, s, v) {
+  if (s < 0.18 || v < 0.10) return null; // skip achromatic (black, white, gray, stars)
+  if (h < 20  || h >= 340) return 'red';
+  if (h < 50)  return 'red';    // orange → red (no orange in PokéAPI)
+  if (h < 80)  return 'yellow';
+  if (h < 165) return 'green';
+  if (h < 260) return 'blue';
+  if (h < 290) return 'purple';
+  if (h < 340) return 'pink';
+  return 'red';
 }
 
 function analyzeCanvas(canvas) {
   const ctx = canvas.getContext('2d');
   const {data} = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const counts = {};
-  COLORS.forEach(c => counts[c] = 0);
+  const counts = { red:0, blue:0, yellow:0, green:0, purple:0, pink:0 };
   for (let i = 0; i < data.length; i += 4) {
-    const name = closestColor(data[i], data[i+1], data[i+2]);
-    if      (name === 'black') counts.black = 0.000000001;
-    else if (name === 'brown') counts.brown = 0.0000000001;
-    else if (name === 'gray')  counts.gray  = 0.00000001;
-    else if (name === 'white') counts.white = 0.3;
-    else counts[name]++;
+    const color = hsvToPokeColor(...Object.values(rgbToHsv(data[i], data[i+1], data[i+2])));
+    if (color) counts[color]++;
   }
-  return Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+  const entries = Object.entries(counts).filter(([,n]) => n > 0);
+  return entries.length ? entries.sort((a,b) => b[1]-a[1])[0][0] : null;
 }
 
 function colorFromText(text) {
