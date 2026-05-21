@@ -499,14 +499,27 @@ function colorFromText(text) {
   return null;
 }
 
+async function fetchViaProxy(url) {
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+  for (const proxyUrl of proxies) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) return res;
+    } catch {}
+  }
+  return null;
+}
+
 async function getColorFromImage(url) {
-  // fetch via CORS proxy → blob → ObjectURL so canvas isn't tainted
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) throw new Error('proxy error');
+    const res = await fetchViaProxy(url);
+    if (!res) return null;
     const blob = await res.blob();
     const objectUrl = URL.createObjectURL(blob);
     return new Promise(resolve => {
