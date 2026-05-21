@@ -440,30 +440,6 @@ async function getColorFromImage(url) {
   });
 }
 
-function colorFromText(text) {
-  const lower = text.toLowerCase();
-
-  // semantic astronomical types — visually dominant color regardless of emission lines mentioned
-  if (/emission nebula|h.?alpha|hα|molecular cloud|star.forming|stellar nursery|orion|nebula.*red|red.*nebula/.test(lower)) return 'red';
-  if (/galaxy cluster|x.ray|collision of galaxy|merging cluster/.test(lower)) return 'blue';
-  if (/reflection nebula|blue.*nebula|nebula.*blue/.test(lower)) return 'blue';
-  if (/planetary nebula/.test(lower)) return 'blue';
-  if (/supernova remnant/.test(lower)) return 'red';
-
-  // direct color keyword scan — red before green to avoid O[III] false positives
-  const checks = [
-    ['red','red'],['scarlet','red'],['crimson','red'],['fiery','red'],
-    ['blue','blue'],['cyan','blue'],['azure','blue'],['indigo','blue'],
-    ['purple','purple'],['violet','purple'],['magenta','purple'],
-    ['yellow','yellow'],['gold','yellow'],['amber','yellow'],
-    ['pink','pink'],['rose','pink'],
-    ['green','green'],
-  ];
-  for (const [keyword, color] of checks) {
-    if (lower.includes(keyword)) return color;
-  }
-  return 'blue'; // space images default to blue
-}
 
 async function getPokemon(color) {
   const res = await fetch(`${POKE_BASE}/pokemon-color/${color}/`);
@@ -529,7 +505,7 @@ async function run() {
     }
 
     let color = imageUrl ? await getColorFromImage(imageUrl) : null;
-    if (!color) color = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
+    if (!color) color = 'blue'; // canvas blocked by CORS on external images; blue is the most common vivid space color
 
     const poke = await getPokemon(color);
     document.getElementById('poke-loading').style.display = 'none';
