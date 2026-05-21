@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pokepod</title>
+<title>Pokémon Space-Gen</title>
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
     font-family: 'Fira Code', monospace;
-    background: #0b0020;
+    background-color: #0b0020;
     color: #e8deff;
     min-height: 100vh;
     display: flex;
@@ -18,8 +18,12 @@
     align-items: center;
     padding: 3rem 1.5rem 5rem;
     background-image:
-      radial-gradient(ellipse 70% 55% at 18% 0%,   rgba(150, 40, 210, 0.22) 0, transparent 55%),
-      radial-gradient(ellipse 55% 40% at 82% 100%,  rgba(0, 170, 230, 0.13) 0, transparent 50%);
+      radial-gradient(ellipse 70% 55% at 18% 0%,   rgba(249, 115, 22, 0.22) 0, transparent 55%),
+      radial-gradient(ellipse 55% 40% at 82% 100%,  rgba(0, 140, 255, 0.18) 0, transparent 50%),
+      linear-gradient(rgba(4, 0, 14, 0.62), rgba(4, 0, 14, 0.62)),
+      url('https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/07/STScI-01GA6KKWG229B16K4Q38CH3BXS.png?w=2000');
+    background-size: auto, auto, auto, cover;
+    background-position: center, center, center, top center;
   }
 
   body::before {
@@ -28,17 +32,17 @@
     inset: 0;
     background-image:
       radial-gradient(1px   1px   at 12% 18%, rgba(255,255,255,0.75) 0, transparent 100%),
-      radial-gradient(1px   1px   at 70%  8%, rgba(200,170,255,0.70) 0, transparent 100%),
+      radial-gradient(1px   1px   at 70%  8%, rgba(255,200,100,0.70) 0, transparent 100%),
       radial-gradient(1px   1px   at 35% 52%, rgba(255,255,255,0.60) 0, transparent 100%),
       radial-gradient(1px   1px   at 86% 38%, rgba(140,210,255,0.65) 0, transparent 100%),
       radial-gradient(1px   1px   at 54% 76%, rgba(255,255,255,0.55) 0, transparent 100%),
-      radial-gradient(1px   1px   at  6% 63%, rgba(255,170,210,0.60) 0, transparent 100%),
+      radial-gradient(1px   1px   at  6% 63%, rgba(255,160,60,0.60)  0, transparent 100%),
       radial-gradient(1px   1px   at 91% 70%, rgba(255,255,255,0.60) 0, transparent 100%),
-      radial-gradient(1px   1px   at 22% 90%, rgba(200,170,255,0.55) 0, transparent 100%),
+      radial-gradient(1px   1px   at 22% 90%, rgba(255,200,100,0.55) 0, transparent 100%),
       radial-gradient(1.5px 1.5px at 48% 14%, rgba(255,255,255,0.80) 0, transparent 100%),
       radial-gradient(1.5px 1.5px at 78% 55%, rgba(140,210,255,0.70) 0, transparent 100%),
       radial-gradient(2px   2px   at 62% 30%, rgba(255,255,255,0.85) 0, transparent 100%),
-      radial-gradient(2px   2px   at 30% 75%, rgba(200,170,255,0.75) 0, transparent 100%);
+      radial-gradient(2px   2px   at 30% 75%, rgba(255,200,100,0.75) 0, transparent 100%);
     pointer-events: none;
     z-index: 0;
   }
@@ -54,18 +58,20 @@
     letter-spacing: -0.02em;
     margin-bottom: 0.3rem;
   }
-  h1 em { color: #c084fc; font-style: normal; }
+  h1 em { color: #f97316; font-style: normal; }
 
   .tagline {
     font-size: 0.72rem;
-    color: #5a4080;
+    color: #7c4a1e;
     letter-spacing: 0.06em;
     margin-top: 0.4rem;
   }
 
   .input-box {
-    background: rgba(14, 4, 32, 0.85);
-    border: 1px solid rgba(160, 90, 240, 0.28);
+    background: rgba(18, 8, 3, 0.92);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(249, 115, 22, 0.65);
     border-radius: 16px;
     padding: 1.75rem 2rem;
     width: 100%;
@@ -76,15 +82,15 @@
   label {
     display: block;
     font-size: 0.68rem;
-    color: #8b6dc0;
+    color: #b07840;
     letter-spacing: 0.14em;
     margin-bottom: 0.6rem;
   }
 
   input[type="date"] {
     width: 100%;
-    background: rgba(5, 0, 18, 0.7);
-    border: 1px solid rgba(160, 90, 240, 0.32);
+    background: rgba(18, 8, 3, 0.80);
+    border: 1px solid rgba(249, 115, 22, 0.65);
     border-radius: 10px;
     padding: 0.8rem 0.9rem;
     color: #e8deff;
@@ -92,14 +98,15 @@
     font-size: 0.92rem;
     margin-bottom: 1rem;
     outline: none;
-    color-scheme: dark;
+    -webkit-appearance: none;
+    appearance: none;
     transition: border-color 0.2s;
   }
-  input[type="date"]:focus { border-color: rgba(192, 132, 252, 0.65); }
+  input[type="date"]:focus { border-color: rgba(249, 115, 22, 0.65); }
 
   button {
     width: 100%;
-    background: #7c3aed;
+    background: #ea580c;
     border: none;
     border-radius: 10px;
     padding: 0.85rem;
@@ -110,7 +117,7 @@
     cursor: pointer;
     transition: background 0.18s, transform 0.1s;
   }
-  button:hover   { background: #6d28d9; }
+  button:hover   { background: #c2410c; }
   button:active  { transform: scale(0.98); }
   button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
@@ -124,8 +131,10 @@
   .results.visible { display: grid; }
 
   .card {
-    background: rgba(14, 4, 32, 0.85);
-    border: 1px solid rgba(160, 90, 240, 0.22);
+    background: rgba(18, 8, 3, 0.92);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(249, 115, 22, 0.22);
     border-radius: 16px;
     padding: 1.4rem;
     transition: border-color 0.4s, box-shadow 0.4s;
@@ -133,7 +142,7 @@
 
   .card-tag {
     font-size: 0.65rem;
-    color: #5a4080;
+    color: #7c4a1e;
     letter-spacing: 0.14em;
     margin-bottom: 0.85rem;
   }
@@ -146,8 +155,8 @@
     display: block;
     margin-bottom: 0.75rem;
   }
-  #apod-title        { font-size: 0.88rem; font-weight: 600; color: #ddd6fe; line-height: 1.4; margin-bottom: 0.3rem; }
-  #apod-date-display { font-size: 0.68rem; color: #4a3070; }
+  #apod-title        { font-size: 0.88rem; font-weight: 600; color: #fed7aa; line-height: 1.4; margin-bottom: 0.3rem; }
+  #apod-date-display { font-size: 0.68rem; color: #5a4020; }
 
   .poke-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.35rem; }
 
@@ -161,7 +170,7 @@
   #poke-name {
     font-size: 1.4rem;
     font-weight: 600;
-    color: #ddd6fe;
+    color: #fed7aa;
     text-transform: capitalize;
   }
 
@@ -177,12 +186,12 @@
     letter-spacing: 0.07em;
   }
 
-  .color-note { font-size: 0.68rem; color: #4a3070; display: flex; align-items: center; gap: 0.4rem; }
+  .color-note { font-size: 0.68rem; color: #5a4020; display: flex; align-items: center; gap: 0.4rem; }
   .swatch     { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
   #poke-flavor {
     font-size: 0.76rem;
-    color: #7060a0;
+    color: #806840;
     line-height: 1.75;
     font-style: italic;
     max-width: 240px;
@@ -200,7 +209,7 @@
     display: inline-block;
     width: 6px; height: 6px;
     border-radius: 50%;
-    background: #c084fc;
+    background: #f97316;
     margin-left: 6px;
     animation: blink 0.9s ease-in-out infinite;
     vertical-align: middle;
@@ -215,7 +224,9 @@
   .java-section { width: 100%; max-width: 880px; margin-top: 2.5rem; }
 
   .java-card {
-    background: rgba(14, 4, 32, 0.85);
+    background: rgba(18, 8, 3, 0.92);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     border: 1px solid rgba(250, 200, 50, 0.18);
     border-radius: 16px;
     padding: 1.75rem 2rem;
@@ -226,12 +237,12 @@
   .java-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
 
   .java-desc h3 { font-size: 1rem; font-weight: 600; color: #fde68a; margin-bottom: 0.85rem; line-height: 1.5; }
-  .java-desc p  { font-size: 0.78rem; color: #9080b8; line-height: 1.9; margin-bottom: 0.75rem; }
+  .java-desc p  { font-size: 0.78rem; color: #fde8c8; line-height: 1.9; margin-bottom: 0.75rem; }
 
-  .change-list { list-style: none; font-size: 0.76rem; color: #9080b8; line-height: 2.1; margin-bottom: 1rem; }
+  .change-list { list-style: none; font-size: 0.76rem; color: #fde8c8; line-height: 2.1; margin-bottom: 1rem; }
   .change-list li::before { content: '// '; color: #4a7a5a; }
 
-  .code-tag { font-size: 0.6rem; color: #4a3070; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+  .code-tag { font-size: 0.6rem; color: #5a4020; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
 
   pre {
     background: rgba(0,0,0,0.5);
@@ -269,12 +280,38 @@
 
   .disclaimer {
     font-size: 0.63rem;
-    color: #3a2860;
+    color: #c09a50;
     letter-spacing: 0.04em;
     line-height: 1.9;
     text-align: center;
     margin-top: -1.5rem;
     margin-bottom: 2rem;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(-50%); }
+    50%       { transform: translateY(calc(-50% - 12px)); }
+  }
+
+  .corner-legend {
+    position: fixed;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.65;
+    width: 200px;
+    image-rendering: pixelated;
+    animation: float 3.6s ease-in-out infinite;
+  }
+  .corner-legend-tr {
+    animation-delay: -1.8s;
+  }
+  .corner-legend-tl {
+    top: 50%;
+    left: 24px;
+  }
+  .corner-legend-tr {
+    top: 50%;
+    right: 24px;
   }
 
   @media (max-width: 620px) {
@@ -288,7 +325,7 @@
 <body>
 
 <header>
-  <h1>poke<em>pod</em></h1>
+  <h1>Pokémon <em>Space-Gen</em></h1>
   <p class="tagline">birthday → nasa apod → pokémon</p>
 </header>
 
@@ -594,5 +631,9 @@ document.getElementById('bday').value = today;
 document.getElementById('go').addEventListener('click', run);
 document.getElementById('bday').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
 </script>
+
+<img class="corner-legend corner-legend-tl" src="https://img.pokemondb.net/sprites/diamond-pearl/shiny/articuno.png" alt="articuno">
+<img class="corner-legend corner-legend-tr" src="https://img.pokemondb.net/sprites/black-white/normal/moltres.png" alt="moltres">
+
 </body>
 </html>
