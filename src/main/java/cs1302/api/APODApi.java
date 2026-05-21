@@ -56,14 +56,14 @@ public class APODApi {
 
     public static final String DEFAULT_IMG = //default image is the first apod
         "https://api.nasa.gov/planetary/apod?api_key=" +
-        "fDLjXx340WUXFwtnRZrpRZKy9LOlQI3ZuYw60jof&date=1995-06-16&hd=true";
+        "DEMO_KEY&date=1995-06-16&hd=true";
 
     private static final int DEFAULT_WIDTH = 600;
     private static final int DEFAULT_HEIGHT = 600;
 
     private static String APOD_API  =
         "https://api.nasa.gov/planetary/apod?api_key"
-        + "=fDLjXx340WUXFwtnRZrpRZKy9LOlQI3ZuYw60jof&date=";
+        + "=DEMO_KEY&date=";
     private static String hd = "&hd=true";
     private static String date = "2022-02-08"; //this is the default date
     private static String uri = APOD_API + date + hd;

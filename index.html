@@ -267,6 +267,16 @@
   }
   .gh-link:hover { background: rgba(250,200,50,0.14); }
 
+  .disclaimer {
+    font-size: 0.63rem;
+    color: #3a2860;
+    letter-spacing: 0.04em;
+    line-height: 1.9;
+    text-align: center;
+    margin-top: -1.5rem;
+    margin-bottom: 2rem;
+  }
+
   @media (max-width: 620px) {
     h1 { font-size: 2rem; }
     .results.visible { grid-template-columns: 1fr; }
@@ -287,6 +297,12 @@
   <input type="date" id="bday" min="1995-06-16">
   <button id="go">find my pokémon →</button>
 </div>
+
+<p class="disclaimer">
+  // uses nasa's DEMO_KEY — 30 requests/hr per IP.<br>
+  // registered keys embedded in client-side code are publicly visible in source.<br>
+  // each visitor gets their own quota.
+</p>
 
 <div class="results" id="results">
   <div class="card" id="apod-card">
@@ -354,7 +370,7 @@
 </div>
 
 <script>
-const NASA_KEY = '5eW76bDFae9tlYl8ANPba9Zp1NJ1fTheQR6Zreng';
+const NASA_KEY = 'DEMO_KEY';
 const APOD_BASE = 'https://api.nasa.gov/planetary/apod';
 const POKE_BASE = 'https://pokeapi.co/api/v2';
 
@@ -536,12 +552,14 @@ async function run() {
     document.getElementById('apod-loading').style.display = 'none';
     document.getElementById('poke-loading').style.display = 'none';
     document.getElementById('apod-card').innerHTML +=
-      `<div class="error-msg">couldn't load — nasa rate limit hit. try again in a minute or <a href="https://api.nasa.gov" style="color:#c084fc">get a free key</a>.</div>`;
+      `<div class="error-msg">nasa rate limit reached.<br><br>this site uses DEMO_KEY, which allows 30 requests per hour per IP —<br>a deliberate tradeoff so no private key is exposed in public source.<br>if you've searched a few times this hour, wait a minute and try again.</div>`;
     console.error(err);
   }
 
-  btn.disabled = false;
-  btn.textContent = 'find my pokémon →';
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = 'find my pokémon →';
+  }, 15000);
 }
 
 const today = new Date().toISOString().slice(0,10);
