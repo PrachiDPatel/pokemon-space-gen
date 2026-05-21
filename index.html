@@ -427,13 +427,12 @@ function analyzeCanvas(canvas) {
 async function getColorFromImage(url) {
   return new Promise(resolve => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
         const canvas = document.getElementById('canvas');
         canvas.getContext('2d').drawImage(img, 0, 0, 100, 100);
         resolve(analyzeCanvas(canvas));
-      } catch { resolve(null); }
+      } catch { resolve(null); } // tainted canvas — no CORS headers on NASA image servers
     };
     img.onerror = () => resolve(null);
     img.src = url;
@@ -441,11 +440,20 @@ async function getColorFromImage(url) {
   });
 }
 
-function dateToColor(dateStr) {
-  const vivid = ['red','blue','yellow','green','purple','pink'];
-  let h = 0;
-  for (const c of dateStr) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return vivid[h % vivid.length];
+function colorFromText(text) {
+  const lower = text.toLowerCase();
+  const checks = [
+    ['blue','blue'],['cyan','blue'],['azure','blue'],['indigo','blue'],
+    ['red','red'],['orange','red'],
+    ['green','green'],['emerald','green'],
+    ['purple','purple'],['violet','purple'],['magenta','purple'],
+    ['pink','pink'],['rose','pink'],
+    ['yellow','yellow'],['gold','yellow'],['amber','yellow'],
+  ];
+  for (const [keyword, color] of checks) {
+    if (lower.includes(keyword)) return color;
+  }
+  return 'blue'; // space images default to blue — more accurate than a date hash
 }
 
 async function getPokemon(color) {
@@ -512,7 +520,7 @@ async function run() {
     }
 
     let color = imageUrl ? await getColorFromImage(imageUrl) : null;
-    if (!color) color = dateToColor(dateVal);
+    if (!color) color = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
 
     const poke = await getPokemon(color);
     document.getElementById('poke-loading').style.display = 'none';
