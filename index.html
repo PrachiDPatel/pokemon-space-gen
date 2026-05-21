@@ -560,7 +560,7 @@ async function run() {
 
   try {
     const apodRes = await fetch(`${APOD_BASE}?api_key=${NASA_KEY}&date=${dateVal}&hd=false`);
-    if (!apodRes.ok) throw new Error(`APOD ${apodRes.status}`);
+    if (!apodRes.ok) throw new Error(`APOD_${apodRes.status}`);
     const apod = await apodRes.json();
 
     document.getElementById('apod-loading').style.display = 'none';
@@ -621,8 +621,19 @@ async function run() {
   } catch (err) {
     document.getElementById('apod-loading').style.display = 'none';
     document.getElementById('poke-loading').style.display = 'none';
+    const msg = err.message || '';
+    let errText;
+    if (msg.includes('APOD_429')) {
+      errText = 'nasa rate limit reached.<br><br>DEMO_KEY allows 30 requests/hr per IP — wait a minute and try again.';
+    } else if (msg.includes('APOD_400')) {
+      errText = 'no apod found for that date.<br><br>APOD launched june 16, 1995 — try a date after that.';
+    } else if (msg.includes('APOD_')) {
+      errText = 'nasa returned an error — their servers may be having a moment. try again shortly.';
+    } else {
+      errText = 'something went wrong — check your connection and try again.';
+    }
     document.getElementById('apod-card').innerHTML +=
-      `<div class="error-msg">nasa rate limit reached.<br><br>this site uses DEMO_KEY, which allows 30 requests per hour per IP — if you've searched a few times this hour, wait a minute and try again.</div>`;
+      `<div class="error-msg">${errText}</div>`;
     console.error(err);
   } finally {
     btn.disabled = false;
