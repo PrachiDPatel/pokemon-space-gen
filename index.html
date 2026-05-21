@@ -315,10 +315,14 @@
   }
 
   @media (max-width: 620px) {
-    h1 { font-size: 2rem; }
+    h1 { font-size: 1.7rem; }
+    body { padding: 2rem 1rem 3rem; overflow-x: hidden; }
     .results.visible { grid-template-columns: 1fr; }
     .java-grid { grid-template-columns: 1fr; }
     .input-box, .java-card { padding: 1.25rem; }
+    .java-desc p, .change-list { word-break: break-word; }
+    pre { white-space: pre-wrap; word-break: break-all; font-size: 0.6rem; }
+    .corner-legend { display: none; }
   }
 </style>
 </head>
