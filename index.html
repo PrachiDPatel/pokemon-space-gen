@@ -324,9 +324,18 @@
     pre { white-space: pre-wrap; word-break: break-all; font-size: 0.6rem; }
     .corner-legend { display: none; }
   }
+  #debug-panel {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.88); color: #4ade80;
+    font-size: 0.6rem; font-family: monospace;
+    padding: 0.5rem 0.75rem; max-height: 180px;
+    overflow-y: auto; z-index: 999;
+    display: none; white-space: pre-wrap;
+  }
 </style>
 </head>
 <body>
+<div id="debug-panel"></div>
 
 <header>
   <h1>Pokémon <em>Space-Gen</em></h1>
@@ -411,6 +420,19 @@
 </div>
 
 <script>
+// mobile debug panel — mirrors [color] logs to screen
+const _log = console.log.bind(console);
+console.log = (...args) => {
+  _log(...args);
+  const msg = args.join(' ');
+  if (msg.includes('[color]')) {
+    const panel = document.getElementById('debug-panel');
+    panel.style.display = 'block';
+    panel.textContent += msg + '\n';
+    panel.scrollTop = panel.scrollHeight;
+  }
+};
+
 const NASA_KEY = 'DEMO_KEY';
 const APOD_BASE = 'https://api.nasa.gov/planetary/apod';
 const POKE_BASE = 'https://pokeapi.co/api/v2';
