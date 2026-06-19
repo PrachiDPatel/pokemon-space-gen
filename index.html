@@ -98,11 +98,13 @@
     font-size: 0.92rem;
     margin-bottom: 1rem;
     outline: none;
-    -webkit-appearance: none;
-    appearance: none;
     transition: border-color 0.2s;
   }
   input[type="date"]:focus { border-color: rgba(249, 115, 22, 0.65); }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
 
   button {
     width: 100%;
@@ -340,8 +342,7 @@
 </div>
 
 <p class="disclaimer">
-  // uses nasa's DEMO_KEY — 30 requests/hr per IP.<br>
-  // each visitor gets their own quota.
+  // 1,000 nasa requests/hr — shared across all visitors.
 </p>
 
 <div class="results" id="results">
@@ -352,6 +353,7 @@
     <img id="apod-img" style="display:none" alt="astronomy picture of the day">
     <div id="apod-title"></div>
     <div id="apod-date-display"></div>
+    <div class="error-msg" id="apod-error" style="display:none"></div>
   </div>
   <div class="card poke-card" id="poke-card">
     <div class="card-tag">// birthday pokémon</div>
@@ -360,12 +362,9 @@
     <div id="poke-name" style="display:none"></div>
     <div class="types" id="types" style="display:none"></div>
     <div class="color-note" id="color-note" style="display:none"></div>
-    <div class="color-note" id="color-fallback-note" style="display:none;font-size:0.6rem;opacity:0.55;margin-top:0.15rem"></div>
     <p id="poke-flavor" style="display:none"></p>
   </div>
 </div>
-
-<canvas id="canvas" style="display:none" width="100" height="100"></canvas>
 
 <div class="java-section">
   <div class="java-card">
@@ -411,8 +410,7 @@
 </div>
 
 <script>
-const NASA_KEY = 'DEMO_KEY';
-const APOD_BASE = 'https://api.nasa.gov/planetary/apod';
+const APOD_BASE = 'https://pokepod-proxy.prachidpatel1.workers.dev';
 const POKE_BASE = 'https://pokeapi.co/api/v2';
 
 const TYPE_COLORS = {
@@ -429,74 +427,60 @@ const COLOR_SWATCHES = {
   gray:'#6b7280',white:'#e5e7eb',
 };
 
-function rgbToHsv(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  let h = 0;
-  if (d > 0) {
-    if      (max === r) h = ((g - b) / d % 6) * 60;
-    else if (max === g) h = ((b - r) / d + 2) * 60;
-    else                h = ((r - g) / d + 4) * 60;
-    if (h < 0) h += 360;
-  }
-  return { h, s: max === 0 ? 0 : d / max, v: max };
-}
+// ported from the original javafx app's closestColor/rgbDistance — every pixel is
+// classified via manhattan distance to the nearest of these 10 reference colors,
+// no pixel gets skipped (unlike the old hue/saturation-based approach)
+const COLOR_ANCHORS = {
+  red:    [225, 0, 0],
+  blue:   [0, 0, 225],
+  yellow: [225, 225, 0],
+  green:  [0, 225, 0],
+  black:  [0, 0, 0],
+  brown:  [102, 51, 0],
+  purple: [127, 0, 255],
+  gray:   [160, 160, 160],
+  white:  [225, 225, 225],
+  pink:   [255, 0, 127],
+};
 
-function hsvToPokeColor(h, s, v) {
-  if (s < 0.18 || v < 0.10) return null; // skip achromatic (black, white, gray, stars)
-  if (h < 25  || h >= 330) return 'red';  // pure red / H-alpha crimson
-  if (h < 80)  return 'yellow';           // orange + yellow both → yellow (no orange in PokéAPI)
-  if (h < 165) return 'green';
-  if (h < 265) return 'blue';
-  if (h < 295) return 'purple';
-  if (h < 330) return 'pink';
-  return 'red';
+// black/brown/gray are de-weighted so they only win the aggregate vote when the
+// image is overwhelmingly that color — same as the java original. white keeps a
+// much higher (but still reduced) weight since legitimately white/snowy/bright
+// images are common, whereas pure black/brown/gray usually just means "no real color."
+const DEWEIGHT = { black: 1e-9, brown: 1e-10, gray: 1e-8, white: 0.3 };
+
+function closestColor(r, g, b) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const [name, [cr, cg, cb]] of Object.entries(COLOR_ANCHORS)) {
+    const dist = Math.abs(r - cr) + Math.abs(g - cg) + Math.abs(b - cb);
+    if (dist < bestDist) { bestDist = dist; best = name; }
+  }
+  return best;
 }
 
 function analyzeCanvas(canvas) {
   const ctx = canvas.getContext('2d');
   const {data} = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const counts = { red:0, blue:0, yellow:0, green:0, purple:0, pink:0 };
+  const counts = {};
+  for (const name of Object.keys(COLOR_ANCHORS)) counts[name] = 0;
+
+  let vividPixels = 0;
   for (let i = 0; i < data.length; i += 4) {
-    const color = hsvToPokeColor(...Object.values(rgbToHsv(data[i], data[i+1], data[i+2])));
-    if (color) counts[color]++;
+    const name = closestColor(data[i], data[i+1], data[i+2]);
+    if (name in DEWEIGHT) counts[name] = DEWEIGHT[name];
+    else { counts[name]++; vividPixels++; }
   }
+
   const entries = Object.entries(counts).filter(([,n]) => n > 0);
-  return entries.length ? entries.sort((a,b) => b[1]-a[1])[0][0] : null;
+  const color = entries.length ? entries.sort((a,b) => b[1]-a[1])[0][0] : null;
+  const vividBuckets = Object.keys(counts).filter(n => !(n in DEWEIGHT) && counts[n] > 0).length;
+  const variation = vividBuckets + vividPixels / (data.length / 4);
+  return { color, variation };
 }
 
-function colorFromText(text) {
-  const lower = text.toLowerCase();
-
-  // object-type checks first — avoids false positives from e.g. O[III] "green" in emission nebula descriptions
-  if (/emission nebula|h.?alpha|hα|molecular cloud|star.?forming|stellar nursery|orion|barnard/.test(lower)) return 'red';
-  if (/supernova remnant|supernova|solar flare|coronal mass ejection/.test(lower)) return 'red';
-  if (/\bmars\b|martian surface/.test(lower)) return 'red';
-  if (/\bjupiter\b|great red spot/.test(lower)) return 'red';
-  if (/aurora|northern lights|southern lights|borealis|australis/.test(lower)) return 'green';
-  if (/\bsun\b|solar corona|chromosphere|photosphere/.test(lower)) return 'yellow';
-  if (/\bsaturn\b/.test(lower)) return 'yellow';
-  if (/globular cluster/.test(lower)) return 'yellow';
-  if (/reflection nebula|planetary nebula|open cluster|star cluster/.test(lower)) return 'blue';
-  if (/galaxy cluster|x.?ray|merging cluster|collision of galax/.test(lower)) return 'blue';
-  if (/\bneptune\b|\buranus\b/.test(lower)) return 'blue';
-
-  // direct color keywords
-  const checks = [
-    ['red','red'],['scarlet','red'],['crimson','red'],['orange','red'],
-    ['blue','blue'],['cyan','blue'],['azure','blue'],['indigo','blue'],['teal','blue'],
-    ['purple','purple'],['violet','purple'],['magenta','purple'],
-    ['yellow','yellow'],['gold','yellow'],['amber','yellow'],
-    ['pink','pink'],['green','green'],['white','white'],
-  ];
-  for (const [kw, color] of checks) {
-    if (lower.includes(kw)) return color;
-  }
-  return null;
-}
-
-async function getColorFromImage(url) {
-  // images.weserv.nl proxies NASA images, adds CORS headers, and resizes to 100×100
+function loadImageCanvas(url, timeoutMs = 5000) {
+  // images.weserv.nl proxies the image, adds CORS headers, and resizes to 100×100
   // so the payload is tiny and canvas.getImageData() isn't blocked
   const proxy = `https://images.weserv.nl/?url=${url.replace(/^https?:\/\//, '')}&w=100&h=100&fit=cover&output=jpg`;
   return new Promise(resolve => {
@@ -504,17 +488,58 @@ async function getColorFromImage(url) {
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
-        const canvas = document.getElementById('canvas');
+        const canvas = document.createElement('canvas');
+        canvas.width = 100;
+        canvas.height = 100;
         canvas.getContext('2d').drawImage(img, 0, 0, 100, 100);
-        resolve(analyzeCanvas(canvas));
+        resolve(canvas);
       } catch { resolve(null); }
     };
     img.onerror = () => resolve(null);
     img.src = proxy;
-    setTimeout(() => resolve(null), 10000);
+    setTimeout(() => resolve(null), timeoutMs);
   });
 }
 
+async function getColorFromImage(url) {
+  const canvas = await loadImageCanvas(url);
+  if (!canvas) throw new Error('IMAGE_LOAD_FAILED');
+  const { color } = analyzeCanvas(canvas);
+  if (!color) throw new Error('NO_DOMINANT_COLOR');
+  return color;
+}
+
+function getYouTubeId(url) {
+  const m = url.match(/(?:youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/watch\?v=)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
+async function getColorFromVideoFrames(videoId) {
+  // youtube auto-generates 3 thumbnail candidates at different points in the video —
+  // grab all 3 in parallel and use whichever is most colorful as the "interesting" frame
+  const urls = [1, 2, 3].map(n => `https://img.youtube.com/vi/${videoId}/${n}.jpg`);
+  const canvases = await Promise.all(urls.map(u => loadImageCanvas(u)));
+  const loaded = canvases.filter(Boolean);
+  if (!loaded.length) throw new Error('IMAGE_LOAD_FAILED');
+  const results = loaded.map(analyzeCanvas).filter(r => r.color);
+  if (!results.length) throw new Error('NO_DOMINANT_COLOR');
+  results.sort((a, b) => b.variation - a.variation);
+  return results[0].color;
+}
+
+
+const CACHE_KEY = 'pokepod_cache_v1';
+
+function loadCache() {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveToCache(date, entry) {
+  const cache = loadCache();
+  cache[date] = entry;
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
 
 async function getPokemon(color) {
   const res = await fetch(`${POKE_BASE}/pokemon-color/${color}/`);
@@ -523,13 +548,15 @@ async function getPokemon(color) {
   const species = data.pokemon_species;
   const pick = species[Math.floor(Math.random() * Math.min(species.length, 40))];
 
-  const pokeRes = await fetch(`${POKE_BASE}/pokemon/${pick.name}/`);
+  const [pokeRes, specRes] = await Promise.all([
+    fetch(`${POKE_BASE}/pokemon/${pick.name}/`),
+    fetch(`${POKE_BASE}/pokemon-species/${pick.name}/`).catch(() => null),
+  ]);
   if (!pokeRes.ok) throw new Error('pokemon fetch failed');
   const poke = await pokeRes.json();
 
   let flavor = '';
   try {
-    const specRes = await fetch(`${POKE_BASE}/pokemon-species/${pick.name}/`);
     const specData = await specRes.json();
     const entry = specData.flavor_text_entries.find(e => e.language.name === 'en');
     if (entry) flavor = entry.flavor_text.replace(/\f/g, ' ');
@@ -543,96 +570,135 @@ async function getPokemon(color) {
   };
 }
 
+function renderApod(dateVal, apodData) {
+  document.getElementById('apod-loading').style.display = 'none';
+  document.getElementById('apod-title').textContent = apodData.title;
+  document.getElementById('apod-date-display').textContent =
+    new Date(dateVal + 'T12:00:00').toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+  if (apodData.mediaType === 'video') {
+    const iframe = document.getElementById('apod-video');
+    iframe.src = apodData.url;
+    iframe.style.display = 'block';
+  } else {
+    const img = document.getElementById('apod-img');
+    img.src = apodData.imageUrl;
+    img.style.display = 'block';
+  }
+}
+
+function renderPoke(color, poke) {
+  document.getElementById('poke-loading').style.display = 'none';
+
+  const sprite = document.getElementById('poke-sprite');
+  sprite.src = poke.sprite;
+  sprite.style.display = 'block';
+
+  const accent = TYPE_COLORS[poke.types[0]] || '#9c4dff';
+  sprite.style.filter = `drop-shadow(0 0 20px ${accent}88)`;
+
+  document.getElementById('poke-name').textContent = poke.name;
+  document.getElementById('poke-name').style.display = 'block';
+
+  const typesEl = document.getElementById('types');
+  typesEl.innerHTML = poke.types.map(t =>
+    `<span class="type-pill" style="background:${TYPE_COLORS[t]||'#555'}">${t}</span>`
+  ).join('');
+  typesEl.style.display = 'flex';
+
+  const swatch = COLOR_SWATCHES[color] || '#888';
+  document.getElementById('color-note').innerHTML =
+    `<span class="swatch" style="background:${swatch}"></span>sky color: ${color}`;
+  document.getElementById('color-note').style.display = 'flex';
+
+  if (poke.flavor) {
+    const el = document.getElementById('poke-flavor');
+    el.textContent = poke.flavor;
+    el.style.display = 'block';
+  }
+
+  const pokeCard = document.getElementById('poke-card');
+  pokeCard.style.borderColor = accent + '44';
+  pokeCard.style.boxShadow = `0 0 30px -8px ${accent}44`;
+}
+
 async function run() {
+  const btn = document.getElementById('go');
+  if (btn.disabled) return;
+
   const dateVal = document.getElementById('bday').value;
   if (!dateVal) return;
 
-  const btn = document.getElementById('go');
   btn.disabled = true;
   btn.textContent = 'loading...';
 
   document.getElementById('results').classList.add('visible');
-  ['apod-img','apod-video','poke-sprite','poke-name','types','color-note','color-fallback-note','poke-flavor']
+  ['apod-img','apod-video','poke-sprite','poke-name','types','color-note','poke-flavor','apod-error']
     .forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('apod-error').innerHTML = '';
   document.getElementById('apod-loading').style.display = 'block';
   document.getElementById('poke-loading').style.display = 'block';
 
   try {
-    const apodRes = await fetch(`${APOD_BASE}?api_key=${NASA_KEY}&date=${dateVal}&hd=false`);
-    if (!apodRes.ok) throw new Error(`APOD_${apodRes.status}`);
-    const apod = await apodRes.json();
+    const cached = loadCache()[dateVal];
 
-    document.getElementById('apod-loading').style.display = 'none';
-    document.getElementById('apod-title').textContent = apod.title;
-    document.getElementById('apod-date-display').textContent =
-      new Date(dateVal + 'T12:00:00').toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-
-    let imageUrl = null;
-    if (apod.media_type === 'video') {
-      const iframe = document.getElementById('apod-video');
-      iframe.src = apod.url;
-      iframe.style.display = 'block';
+    if (cached) {
+      renderApod(dateVal, cached.apodData);
+      renderPoke(cached.color, cached.poke);
     } else {
-      imageUrl = apod.hdurl || apod.url;
-      const img = document.getElementById('apod-img');
-      img.src = imageUrl;
-      img.style.display = 'block';
+      if (dateVal > new Date().toISOString().slice(0,10)) throw new Error('FUTURE_DATE');
+
+      const apodRes = await fetch(`${APOD_BASE}/?date=${dateVal}`);
+      if (!apodRes.ok) throw new Error(`APOD_${apodRes.status}`);
+      const apod = await apodRes.json();
+
+      const isVideo = apod.media_type === 'video';
+      const displayUrl = isVideo ? null : (apod.hdurl || apod.url);
+      const apodData = { title: apod.title, mediaType: apod.media_type, url: apod.url, imageUrl: displayUrl };
+      renderApod(dateVal, apodData);
+
+      let color;
+      if (isVideo) {
+        const videoId = getYouTubeId(apod.url);
+        if (!videoId) throw new Error('NO_IMAGE');
+        color = await getColorFromVideoFrames(videoId);
+      } else {
+        // standard-res apod.url (not hdurl) — weserv.nl only needs to fetch+resize a small
+        // source image for 100x100 color sampling; the HD file is just for on-screen display
+        color = await getColorFromImage(apod.url);
+      }
+
+      const poke = await getPokemon(color);
+      renderPoke(color, poke);
+
+      saveToCache(dateVal, { apodData, color, poke });
     }
-
-    let color = imageUrl ? await getColorFromImage(imageUrl) : null;
-    if (!color) color = colorFromText((apod.title || '') + ' ' + (apod.explanation || ''));
-    if (!color) color = 'blue';
-
-    const poke = await getPokemon(color);
-    document.getElementById('poke-loading').style.display = 'none';
-
-    const sprite = document.getElementById('poke-sprite');
-    sprite.src = poke.sprite;
-    sprite.style.display = 'block';
-
-    const accent = TYPE_COLORS[poke.types[0]] || '#9c4dff';
-    sprite.style.filter = `drop-shadow(0 0 20px ${accent}88)`;
-
-    document.getElementById('poke-name').textContent = poke.name;
-    document.getElementById('poke-name').style.display = 'block';
-
-    const typesEl = document.getElementById('types');
-    typesEl.innerHTML = poke.types.map(t =>
-      `<span class="type-pill" style="background:${TYPE_COLORS[t]||'#555'}">${t}</span>`
-    ).join('');
-    typesEl.style.display = 'flex';
-
-    const swatch = COLOR_SWATCHES[color] || '#888';
-    document.getElementById('color-note').innerHTML =
-      `<span class="swatch" style="background:${swatch}"></span>sky color: ${color}`;
-    document.getElementById('color-note').style.display = 'flex';
-
-    if (poke.flavor) {
-      const el = document.getElementById('poke-flavor');
-      el.textContent = poke.flavor;
-      el.style.display = 'block';
-    }
-
-    const pokeCard = document.getElementById('poke-card');
-    pokeCard.style.borderColor = accent + '44';
-    pokeCard.style.boxShadow = `0 0 30px -8px ${accent}44`;
 
   } catch (err) {
     document.getElementById('apod-loading').style.display = 'none';
     document.getElementById('poke-loading').style.display = 'none';
     const msg = err.message || '';
     let errText;
-    if (msg.includes('APOD_429')) {
-      errText = 'nasa rate limit reached.<br><br>DEMO_KEY allows 30 requests/hr per IP — wait a minute and try again.';
+    if (msg === 'FUTURE_DATE') {
+      errText = "that date hasn't happened yet — nasa hasn't published an apod for it.<br><br>pick a date no later than today.";
+    } else if (msg.includes('APOD_429')) {
+      errText = 'nasa rate limit reached — wait a few minutes and try again.';
     } else if (msg.includes('APOD_400')) {
       errText = 'no apod found for that date.<br><br>APOD launched june 16, 1995 — try a date after that.';
     } else if (msg.includes('APOD_')) {
       errText = 'nasa returned an error — their servers may be having a moment. try again shortly.';
+    } else if (msg === 'NO_IMAGE') {
+      errText = "today's apod is a video that isn't hosted on youtube — no frame available to analyze.<br><br>try a different date.";
+    } else if (msg === 'IMAGE_LOAD_FAILED') {
+      errText = "couldn't load the image to analyze — the proxy may be slow or unreachable.<br><br>try again, or try a different date.";
+    } else if (msg === 'NO_DOMINANT_COLOR') {
+      errText = "this image doesn't have a clear dominant color — it's likely mostly black, white, or gray.<br><br>try a different date.";
     } else {
       errText = 'something went wrong — check your connection and try again.';
     }
-    document.getElementById('apod-card').innerHTML +=
-      `<div class="error-msg">${errText}</div>`;
+    const errEl = document.getElementById('apod-error');
+    errEl.innerHTML = errText;
+    errEl.style.display = 'block';
     console.error(err);
   } finally {
     btn.disabled = false;
