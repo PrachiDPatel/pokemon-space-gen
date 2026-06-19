@@ -21,3 +21,4 @@ gitreset.sh
 
 worker/node_modules/
 worker/.wrangler/
+scripts/apod-archive/

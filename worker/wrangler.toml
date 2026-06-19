@@ -1,3 +1,10 @@
 name = "pokepod-proxy"
 main = "src/index.js"
 compatibility_date = "2026-06-18"
+
+[[kv_namespaces]]
+binding = "APOD_CACHE"
+id = "ed6b9634e03e49af841ee041d9efbeae"
+
+[triggers]
+crons = ["0 6 * * *", "*/5 * * * *"]
