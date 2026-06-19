@@ -149,23 +149,87 @@
     margin-bottom: 0.85rem;
   }
 
+  .apod-img-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/10;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+  }
   #apod-img {
     width: 100%;
-    border-radius: 10px;
-    aspect-ratio: 16/10;
+    height: 100%;
     object-fit: cover;
     display: block;
-    margin-bottom: 0.75rem;
   }
   #apod-title        { font-size: 0.88rem; font-weight: 600; color: #fed7aa; line-height: 1.4; margin-bottom: 0.3rem; }
   #apod-date-display { font-size: 0.68rem; color: #5a4020; }
 
   .poke-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.35rem; }
 
+  .poke-sprite-wrap { position: relative; width: 140px; height: 140px; margin: 0.4rem 0; }
+
+  @keyframes shimmer-pan {
+    0%   { background-position: 0px 0px; }
+    100% { background-position: 300px 300px; }
+  }
+
+  .shimmer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    mix-blend-mode: color-dodge;
+    /* repeating, not a single sweep with transparent margins — a fixed-length
+       tile (last stop matches the first color) loops seamlessly with no "off"
+       gaps as it pans, like a cylinder of rainbow rolling past rather than a
+       single patch sliding across and out of frame */
+    background-image: repeating-linear-gradient(
+      115deg,
+      rgba(255,0,150,0.5) 0px,
+      rgba(255,200,0,0.5) 30px,
+      rgba(0,255,150,0.5) 60px,
+      rgba(0,150,255,0.5) 90px,
+      rgba(200,0,255,0.5) 120px,
+      rgba(255,0,150,0.5) 150px
+    );
+    transition: opacity 0.4s;
+  }
+  .shimmer.active {
+    opacity: 1;
+    animation: shimmer-pan 28s linear infinite;
+  }
+
+  #poke-shimmer {
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+
+  /* apod's shimmer has no silhouette mask (it's a plain rectangle, not a
+     sprite), so feather it with a soft fade instead — keeps the rainbow from
+     looking like a hard-edged box sitting on top of the photo. also uses a
+     much gentler blend mode + lower opacity than the sprite: color-dodge blows
+     out bright/similar colors toward white, which looked especially bad where
+     the rainbow's yellow band crossed the nebula's own yellow/orange regions. */
+  #apod-shimmer {
+    mix-blend-mode: soft-light;
+    -webkit-mask-image: radial-gradient(ellipse at center, black 45%, transparent 90%);
+    mask-image: radial-gradient(ellipse at center, black 45%, transparent 90%);
+  }
+  #apod-shimmer.active {
+    opacity: 0.35;
+  }
+
   #poke-sprite {
+    position: relative;
     width: 140px; height: 140px;
     image-rendering: pixelated;
-    margin: 0.4rem 0;
+    margin: 0;
     transition: filter 0.4s;
   }
 
@@ -350,7 +414,10 @@
     <div class="card-tag">// birthday sky</div>
     <div class="loading" id="apod-loading">fetching from nasa</div>
     <iframe id="apod-video" allowfullscreen></iframe>
-    <img id="apod-img" style="display:none" alt="astronomy picture of the day">
+    <div class="apod-img-wrap" id="apod-img-wrap" style="display:none">
+      <img id="apod-img" alt="astronomy picture of the day">
+      <div id="apod-shimmer" class="shimmer"></div>
+    </div>
     <div id="apod-title"></div>
     <div id="apod-date-display"></div>
     <div class="error-msg" id="apod-error" style="display:none"></div>
@@ -358,7 +425,10 @@
   <div class="card poke-card" id="poke-card">
     <div class="card-tag">// birthday pokémon</div>
     <div class="loading" id="poke-loading">querying pokéapi</div>
-    <img id="poke-sprite" style="display:none" alt="pokémon">
+    <div class="poke-sprite-wrap">
+      <img id="poke-sprite" style="display:none" alt="pokémon">
+      <div id="poke-shimmer" class="shimmer"></div>
+    </div>
     <div id="poke-name" style="display:none"></div>
     <div class="types" id="types" style="display:none"></div>
     <div class="color-note" id="color-note" style="display:none"></div>
@@ -443,17 +513,45 @@ const COLOR_ANCHORS = {
   pink:   [255, 0, 127],
 };
 
-// black/brown/gray are de-weighted so they only win the aggregate vote when the
-// image is overwhelmingly that color — same as the java original. white keeps a
-// much higher (but still reduced) weight since legitimately white/snowy/bright
-// images are common, whereas pure black/brown/gray usually just means "no real color."
-const DEWEIGHT = { black: 1e-9, brown: 1e-10, gray: 1e-8, white: 0.3 };
+const ACHROMATIC = new Set(['black', 'brown', 'gray', 'white']);
+
+// achromatic colors compete fairly among themselves by real pixel count, but the
+// whole group's total gets discounted hard against vivid colors — a handful of
+// genuinely colorful pixels should beat an image that's 99% black/gray space
+const ACHROMATIC_DISCOUNT = 0.0001;
+
+// the discount above only fixes the AGGREGATE vote — it doesn't help if a pixel
+// was already classified as gray instead of blue in the first place. a pixel
+// that's only mildly blue-tinted gray is genuinely closer (manhattan distance)
+// to the gray anchor than the pure blue one, so without this it never even
+// reaches the vivid bucket to be counted. penalizing achromatic anchors here
+// biases borderline/tinted pixels toward the vivid color they're leaning
+// towards — accepting that occasional chromatic-aberration noise will also get
+// caught this way is an intentional tradeoff: a greyscale image should resolve
+// to black/white, but a greyscale image with one real blue star should resolve
+// to blue, and there's no cheap way to tell "real small feature" from "noise"
+// other than just favoring "some color exists" over "call it neutral."
+const ACHROMATIC_PIXEL_PENALTY = 1.5;
+
+// neutral anchors only — used for pixels that have no real hue at all. brown's
+// reference point [102,51,0] isn't on the gray diagonal (unlike black/gray/
+// white, which all have r=g=b), so for a wide range of genuinely neutral pixel
+// values (manhattan distance puts roughly 35-105 closer to brown than to gray
+// or black) brown would otherwise win despite the pixel having zero actual
+// color — a true grayscale image should resolve to black/white, never brown.
+const NEUTRAL_ANCHORS = ['black', 'gray', 'white'];
+const NEUTRAL_SPREAD_THRESHOLD = 20; // max-min channel spread below this = "no real hue"
 
 function closestColor(r, g, b) {
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  const candidates = spread < NEUTRAL_SPREAD_THRESHOLD ? NEUTRAL_ANCHORS : Object.keys(COLOR_ANCHORS);
+
   let best = null;
   let bestDist = Infinity;
-  for (const [name, [cr, cg, cb]] of Object.entries(COLOR_ANCHORS)) {
-    const dist = Math.abs(r - cr) + Math.abs(g - cg) + Math.abs(b - cb);
+  for (const name of candidates) {
+    const [cr, cg, cb] = COLOR_ANCHORS[name];
+    let dist = Math.abs(r - cr) + Math.abs(g - cg) + Math.abs(b - cb);
+    if (ACHROMATIC.has(name)) dist *= ACHROMATIC_PIXEL_PENALTY;
     if (dist < bestDist) { bestDist = dist; best = name; }
   }
   return best;
@@ -465,16 +563,20 @@ function analyzeCanvas(canvas) {
   const counts = {};
   for (const name of Object.keys(COLOR_ANCHORS)) counts[name] = 0;
 
-  let vividPixels = 0;
   for (let i = 0; i < data.length; i += 4) {
     const name = closestColor(data[i], data[i+1], data[i+2]);
-    if (name in DEWEIGHT) counts[name] = DEWEIGHT[name];
-    else { counts[name]++; vividPixels++; }
+    counts[name]++;
+  }
+
+  let vividPixels = 0;
+  for (const name of Object.keys(counts)) {
+    if (ACHROMATIC.has(name)) counts[name] *= ACHROMATIC_DISCOUNT;
+    else vividPixels += counts[name];
   }
 
   const entries = Object.entries(counts).filter(([,n]) => n > 0);
   const color = entries.length ? entries.sort((a,b) => b[1]-a[1])[0][0] : null;
-  const vividBuckets = Object.keys(counts).filter(n => !(n in DEWEIGHT) && counts[n] > 0).length;
+  const vividBuckets = Object.keys(counts).filter(n => !ACHROMATIC.has(n) && counts[n] > 0).length;
   const variation = vividBuckets + vividPixels / (data.length / 4);
   return { color, variation };
 }
@@ -570,11 +672,71 @@ async function getPokemon(color) {
   };
 }
 
+// holo-card shimmer: a passive css animation (.shimmer.active, in <style>) pans
+// the rainbow/texture continuously so it's visible without scrolling at all.
+// for the sprite, it's masked to the pokémon's own silhouette so the rainbow
+// only plays across its body, not a plain rectangle — the apod image needs no
+// mask since it's already a plain rectangle. scrolling additionally rotates
+// the hue on top of the passive pan, like tilting a foil card as you move it.
+const SHIMMER_IDS = ['poke-shimmer', 'apod-shimmer'];
+
+function enableShimmer(id, maskUrl) {
+  const shimmer = document.getElementById(id);
+  if (maskUrl) {
+    shimmer.style.maskImage = `url("${maskUrl}")`;
+    shimmer.style.webkitMaskImage = `url("${maskUrl}")`;
+  }
+  shimmer.classList.add('active');
+}
+
+function disableShimmer(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+window.addEventListener('scroll', () => {
+  const deg = (window.scrollY % 720) / 720 * 360;
+  for (const id of SHIMMER_IDS) {
+    const shimmer = document.getElementById(id);
+    if (shimmer.classList.contains('active')) shimmer.style.filter = `hue-rotate(${deg}deg)`;
+  }
+}, { passive: true });
+
+// easter egg for confirmed apod gaps (nasa has no entry for a small handful of
+// dates, mostly in june 1995 before it became a strict daily habit) — a shiny
+// arceus instead of an error, since arceus is pokémon lore's "creator of the
+// universe" and shiny sprites are themselves a rare, special-occasion thing
+async function getArceusShiny() {
+  const res = await fetch(`${POKE_BASE}/pokemon/arceus/`);
+  const poke = await res.json();
+  return {
+    name: 'shiny arceus',
+    sprite: poke.sprites.other?.['official-artwork']?.front_shiny || poke.sprites.front_shiny,
+    types: poke.types.map(t => t.type.name),
+    flavor: "✨ even nasa took a day off — have a shiny arceus instead.",
+  };
+}
+
+async function renderGapEasterEgg(dateVal) {
+  document.getElementById('apod-loading').style.display = 'none';
+  document.getElementById('apod-title').textContent = 'no apod for this date';
+  document.getElementById('apod-date-display').textContent =
+    new Date(dateVal + 'T12:00:00').toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  const img = document.getElementById('apod-img');
+  img.src = 'assets/rosette-nebula.jpg';
+  document.getElementById('apod-img-wrap').style.display = 'block';
+  enableShimmer('apod-shimmer'); // no mask needed — apod-img is already a plain rectangle
+
+  const arceus = await getArceusShiny();
+  renderPoke(null, arceus);
+  enableShimmer('poke-shimmer', arceus.sprite);
+}
+
 function renderApod(dateVal, apodData) {
   document.getElementById('apod-loading').style.display = 'none';
   document.getElementById('apod-title').textContent = apodData.title;
   document.getElementById('apod-date-display').textContent =
     new Date(dateVal + 'T12:00:00').toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  disableShimmer('apod-shimmer'); // reset by default; renderGapEasterEgg re-enables it after calling this
 
   if (apodData.mediaType === 'video') {
     const iframe = document.getElementById('apod-video');
@@ -583,12 +745,13 @@ function renderApod(dateVal, apodData) {
   } else {
     const img = document.getElementById('apod-img');
     img.src = apodData.imageUrl;
-    img.style.display = 'block';
+    document.getElementById('apod-img-wrap').style.display = 'block';
   }
 }
 
 function renderPoke(color, poke) {
   document.getElementById('poke-loading').style.display = 'none';
+  disableShimmer('poke-shimmer'); // reset by default; renderGapEasterEgg re-enables it after calling this
 
   const sprite = document.getElementById('poke-sprite');
   sprite.src = poke.sprite;
@@ -606,10 +769,12 @@ function renderPoke(color, poke) {
   ).join('');
   typesEl.style.display = 'flex';
 
-  const swatch = COLOR_SWATCHES[color] || '#888';
-  document.getElementById('color-note').innerHTML =
-    `<span class="swatch" style="background:${swatch}"></span>sky color: ${color}`;
-  document.getElementById('color-note').style.display = 'flex';
+  if (color) {
+    const swatch = COLOR_SWATCHES[color] || '#888';
+    document.getElementById('color-note').innerHTML =
+      `<span class="swatch" style="background:${swatch}"></span>sky color: ${color}`;
+    document.getElementById('color-note').style.display = 'flex';
+  }
 
   if (poke.flavor) {
     const el = document.getElementById('poke-flavor');
@@ -633,7 +798,7 @@ async function run() {
   btn.textContent = 'loading...';
 
   document.getElementById('results').classList.add('visible');
-  ['apod-img','apod-video','poke-sprite','poke-name','types','color-note','poke-flavor','apod-error']
+  ['apod-img-wrap','apod-video','poke-sprite','poke-name','types','color-note','poke-flavor','apod-error']
     .forEach(id => document.getElementById(id).style.display = 'none');
   document.getElementById('apod-error').innerHTML = '';
   document.getElementById('apod-loading').style.display = 'block';
@@ -643,14 +808,25 @@ async function run() {
     const cached = loadCache()[dateVal];
 
     if (cached) {
-      renderApod(dateVal, cached.apodData);
-      renderPoke(cached.color, cached.poke);
+      if (cached.gap) {
+        await renderGapEasterEgg(dateVal);
+      } else {
+        renderApod(dateVal, cached.apodData);
+        renderPoke(cached.color, cached.poke);
+      }
     } else {
       if (dateVal > new Date().toISOString().slice(0,10)) throw new Error('FUTURE_DATE');
+      if (dateVal < '1995-06-16') throw new Error('TOO_EARLY');
 
       const apodRes = await fetch(`${APOD_BASE}/?date=${dateVal}`);
+      const apodBody = await apodRes.json().catch(() => null);
+      if (apodRes.status === 404 && apodBody?.gap) {
+        await renderGapEasterEgg(dateVal);
+        saveToCache(dateVal, { gap: true });
+        return;
+      }
       if (!apodRes.ok) throw new Error(`APOD_${apodRes.status}`);
-      const apod = await apodRes.json();
+      const apod = apodBody;
 
       const isVideo = apod.media_type === 'video';
       const displayUrl = isVideo ? null : (apod.hdurl || apod.url);
@@ -681,6 +857,8 @@ async function run() {
     let errText;
     if (msg === 'FUTURE_DATE') {
       errText = "that date hasn't happened yet — nasa hasn't published an apod for it.<br><br>pick a date no later than today.";
+    } else if (msg === 'TOO_EARLY') {
+      errText = 'APOD launched june 16, 1995 — pick a date on or after that.';
     } else if (msg.includes('APOD_429')) {
       errText = 'nasa rate limit reached — wait a few minutes and try again.';
     } else if (msg.includes('APOD_400')) {
